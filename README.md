@@ -1,2 +1,5 @@
 # pearslice.github.io
-Github pages
+Github page https://pearslice.github.io/
+
+# Doc
+https://pages.github.com/
