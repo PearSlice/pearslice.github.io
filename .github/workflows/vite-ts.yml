@@ -11,9 +11,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: my-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -24,12 +21,20 @@ jobs:
           cache: 'npm'
           cache-dependency-path: my-pages/package-lock.json
       - name: Install dependencies
+        working-directory: my-pages
         run: npm ci
       - name: Build
+        working-directory: my-pages
         run: npm run build
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          rsync -a --exclude='.git' --exclude='.github' --exclude='my-pages' --exclude='site' ./ site/
+          mkdir -p site/my-pages
+          cp -r my-pages/dist/. site/my-pages/
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: my-pages/dist
+          publish_dir: site
           keep_files: true
