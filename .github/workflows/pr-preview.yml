@@ -40,6 +40,7 @@ jobs:
         uses: rossjrw/pr-preview-action@v1
         with:
           source-dir: site
+          pages-base-url: https://pearslice.github.io
 
   remove-preview:
     if: github.event.action == 'closed'
@@ -52,3 +53,4 @@ jobs:
         uses: rossjrw/pr-preview-action@v1
         with:
           action: remove
+          pages-base-url: https://pearslice.github.io
