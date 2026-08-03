@@ -15,9 +15,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    defaults:
-      run:
-        working-directory: my-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -28,13 +25,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: my-pages/package-lock.json
       - name: Install dependencies
+        working-directory: my-pages
         run: npm ci
       - name: Build
+        working-directory: my-pages
         run: npm run build
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          rsync -a --exclude='.git' --exclude='.github' --exclude='my-pages' --exclude='site' ./ site/
+          mkdir -p site/my-pages
+          cp -r my-pages/dist/. site/my-pages/
       - name: Deploy preview
         uses: rossjrw/pr-preview-action@v1
         with:
-          source-dir: my-pages/dist
+          source-dir: site
 
   remove-preview:
     if: github.event.action == 'closed'
