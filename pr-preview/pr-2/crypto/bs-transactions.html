@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bitstamp Transactions Table</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        input, button, select { margin: 5px 0; padding: 8px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #eee; }
+    </style>
+</head>
+<body>
+<h1>Bitstamp Transactions</h1>
+
+<input id="worker" placeholder="Worker"><br>
+<input id="apiKey" placeholder="API Key"><br>
+<input id="apiSecret" type="password" placeholder="API Secret"><br>
+<button onclick="getTransactions()">Get Transactions</button>
+
+<h3>Filter by Crypto:</h3>
+<select id="cryptoFilter" onchange="renderTable()">
+    <option value="">All</option>
+</select>
+
+<table id="transactionsTable">
+    <thead>
+    <tr>
+        <th>Datetime</th>
+        <th>Crypto</th>
+        <th>Crypto</th>
+        <th>Fiat</th>
+        <th>Fee</th>
+        <th>Fiat</th>
+        <th>Rate</th>
+        <th>Order id</th>
+        <th>Nb tx</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+    let transactions = []; // store all fetched transactions
+
+    async function getTransactions() {
+        const apiKey = document.getElementById("apiKey").value.trim();
+        const apiSecret = document.getElementById("apiSecret").value.trim();
+        const worker = document.getElementById("worker").value.trim();
+        if (!apiKey || !apiSecret) {
+            alert("Please enter API key and secret");
+            return;
+        }
+
+        // --- Build headers & body as before ---
+        const urlHost = "www.bitstamp.net";
+        const urlPath = "/api/v2/user_transactions/";
+        const httpVerb = "POST";
+        const contentType = "application/x-www-form-urlencoded";
+        const version = "v2";
+        const payloadString = "offset=1";
+
+        const timestamp = Date.now().toString();
+        const nonce = crypto.randomUUID();
+        const authKey = `BITSTAMP ${apiKey}`;
+        const signatureString =
+            authKey +
+            httpVerb +
+            urlHost +
+            urlPath +
+            "" +
+            contentType +
+            nonce +
+            timestamp +
+            version +
+            payloadString;
+
+        const enc = new TextEncoder();
+        const secretKey = await crypto.subtle.importKey(
+            "raw", enc.encode(apiSecret),
+            { name: "HMAC", hash: "SHA-256" },
+            false, ["sign"]
+        );
+        const sigBuffer = await crypto.subtle.sign("HMAC", secretKey, enc.encode(signatureString));
+        const sigArray = Array.from(new Uint8Array(sigBuffer));
+        const signatureHex = sigArray.map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+
+        const headers = {
+            "X-Auth": authKey,
+            "X-Auth-Signature": signatureHex,
+            "X-Auth-Nonce": nonce,
+            "X-Auth-Timestamp": timestamp,
+            "X-Auth-Version": version,
+            "Content-Type": contentType,
+        };
+
+        try {
+            const response = await fetch(worker, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ headers, body: payloadString })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            // Map the fields to datetime, fee, crypto, fiat, rate
+            const grouped = data
+                .filter(t => t.type === '2')
+                .map(tx => {
+                    const arr = Object.keys(tx)
+                    const pair = arr[6]
+                    const cc = pair.split("_")[0]
+                    const fc = pair.split("_")[1]
+
+                    return ({
+                        datetime: tx.datetime,
+                        fee: parseFloat(tx.fee),
+                        crypto: parseFloat(tx[cc]),
+                        cc: cc,
+                        fiat: parseFloat(tx[fc]),
+                        c: fc,
+                        rate: tx[pair],
+                        oid: tx.order_id,
+                        nbtx: 1
+                    })})
+                .reduce((acc, tx) => {
+                    const id = tx.oid;
+                    if (!acc[id]) {
+                        acc[id] = tx
+                    } else {
+                        acc[id].fee = acc[id].fee + tx.fee
+                        acc[id].crypto = acc[id].crypto + tx.crypto
+                        acc[id].fiat = acc[id].fiat + tx.fiat
+                        acc[id].nbtx = acc[id].nbtx + tx.nbtx
+                    }
+
+                    return acc;
+                },{});
+
+            transactions = Object.values(grouped);
+
+            populateCryptoFilter();
+            renderTable();
+
+        } catch (err) {
+            alert("Error: " + err.message);
+        }
+    }
+
+    function populateCryptoFilter() {
+        const cryptoSelect = document.getElementById("cryptoFilter");
+        cryptoSelect.innerHTML = '<option value="">All</option>';
+        const cryptos = [...new Set(transactions.map(tx => tx.cc))];
+        cryptos.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c;
+            opt.textContent = c;
+            cryptoSelect.appendChild(opt);
+        });
+    }
+
+    function renderTable() {
+        const filter = document.getElementById("cryptoFilter").value;
+        const tbody = document.querySelector("#transactionsTable tbody");
+        tbody.innerHTML = "";
+
+        transactions
+            .filter(t => !filter || t.cc === filter)
+            .forEach(tx => {
+                const tr = document.createElement("tr");
+                tbody.appendChild(tr);
+                tr.innerHTML = `
+            <td>${tx.datetime}</td>
+            <td>${tx.crypto}</td>
+            <td>${tx.cc}</td>
+            <td>${tx.fiat}</td>
+            <td>${tx.fee}</td>
+            <td>${tx.c}</td>
+            <td>${tx.rate}</td>
+            <td>${tx.oid}</td>
+            <td>${tx.nbtx}</td>
+          `;
+            });
+    }
+</script>
+</body>
+</html>

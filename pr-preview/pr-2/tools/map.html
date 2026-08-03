@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>OpenStreetMap — Static Leaflet Page</title>
+    <link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+        }
+
+        .layout {
+            display: flex;
+            height: 100%;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 10px;
+            box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+        }
+        .sidebar h3 { margin-top: 0; font-size: 16px; }
+        .marker-item { padding: 6px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .marker-item:hover { background: #f3f3f3; }
+
+        #map {
+            flex: 1;
+        }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            padding: 8px 10px;
+            min-width: 220px;
+            font-size: 13px;
+        }
+        .controls button, .controls select, .controls input {
+            margin-top: 6px;
+            width: 100%;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background: #f7f7f7;
+            cursor: pointer;
+        }
+        .coords {
+            font-family: monospace;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .coords small { color: #444; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div class="sidebar" id="sidebar">
+        <h3>Markers</h3>
+        <div id="markerList">No markers yet</div>
+    </div>
+    <div id="map"></div>
+</div>
+
+<div class="controls" id="controls">
+    <div><strong>OpenStreetMap (Leaflet)</strong></div>
+    <div style="margin-top:6px">Click on the map to place a marker with a radius overlay. Right-click a marker for options.</div>
+    <div class="coords" id="coords">
+        <small id="lat">Lat: —</small>
+        <small id="lng">Lng: —</small>
+    </div>
+    <label for="radiusInput">Radius</label>
+    <input id="radiusInput" min="0.1" step="0.1" type="number" value="1" />
+    <select id="unitSelect">
+        <option selected value="km">Kilometers</option>
+        <option value="mi">Miles</option>
+    </select>
+    <label for="labelInput">Label</label>
+    <input id="labelInput" placeholder="Optional marker label" type="text" />
+    <button id="locateBtn">Locate me (Geolocation)</button>
+    <button id="clearBtn">Clear markers</button>
+    <button id="copyBtn">Copy lat,lng</button>
+</div>
+
+<script crossorigin="" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const DEFAULT_CENTER = [46.8182, 8.2275];
+    const DEFAULT_ZOOM = 8;
+
+    const map = L.map('map', {
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        zoomControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    L.control.scale({imperial: false}).addTo(map);
+
+    const markers = L.layerGroup().addTo(map);
+
+    const latEl = document.getElementById('lat');
+    const lngEl = document.getElementById('lng');
+    const locateBtn = document.getElementById('locateBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const radiusInput = document.getElementById('radiusInput');
+    const unitSelect = document.getElementById('unitSelect');
+    const labelInput = document.getElementById('labelInput');
+    const markerList = document.getElementById('markerList');
+
+    const allMarkers = {};
+
+    function setCoordsUI(lat, lng){
+        latEl.textContent = 'Lat: ' + lat.toFixed(6);
+        lngEl.textContent = 'Lng: ' + lng.toFixed(6);
+    }
+
+    function clearCoordsUI(){
+        latEl.textContent = 'Lat: —';
+        lngEl.textContent = 'Lng: —';
+    }
+
+    function convertRadius(value, unit){
+        if(unit === 'km') return value * 1000;
+        if(unit === 'mi') return value * 1609.34;
+        return value;
+    }
+
+    function refreshMarkerList(){
+        markerList.innerHTML = '';
+        const ids = Object.keys(allMarkers);
+        if(ids.length === 0){
+            markerList.textContent = 'No markers yet';
+            return;
+        }
+        ids.forEach(id => {
+            const marker = allMarkers[id];
+            const item = document.createElement('div');
+            item.className = 'marker-item';
+            item.textContent = marker.label || `Marker ${id}`;
+            item.onclick = () => {
+                map.setView(marker.getLatLng(), 13);
+                marker.openPopup();
+            };
+            markerList.appendChild(item);
+        });
+    }
+
+    function addMarker(lat, lng){
+        const m = L.marker([lat, lng]).addTo(markers);
+        const radiusMeters = convertRadius(parseFloat(radiusInput.value), unitSelect.value);
+        const circle = L.circle([lat, lng], {
+            radius: radiusMeters,
+            color: '#333',
+            weight: 2,
+            fillColor: '#3388ff',
+            fillOpacity: 0.2
+        }).addTo(markers);
+
+        m.circle = circle;
+        m.radiusValue = parseFloat(radiusInput.value);
+        m.radiusUnit = unitSelect.value;
+        m.label = labelInput.value.trim();
+
+        m.bindPopup(getPopupContent(m), {closeButton: false});
+
+        m.on('contextmenu', (e) => {
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent(`<button onclick="editMarkerById(${m._leaflet_id})">Edit radius</button><br><button onclick="removeMarkerById(${m._leaflet_id})">Remove marker</button>`)
+                .openOn(map);
+        });
+
+        allMarkers[m._leaflet_id] = m;
+        refreshMarkerList();
+
+        setCoordsUI(lat, lng);
+    }
+
+    function getPopupContent(marker){
+        return '<strong>' + (marker.label || 'Marker') + '</strong><br>Lat: ' + marker.getLatLng().lat.toFixed(6) + '<br>Lng: ' + marker.getLatLng().lng.toFixed(6) +
+            '<br>Radius: ' + marker.radiusValue + ' ' + marker.radiusUnit +
+            '<br><button onclick="editMarkerById(' + marker._leaflet_id + ')">Edit radius</button>' +
+            '<br><button onclick="removeMarkerById(' + marker._leaflet_id + ')">Remove marker</button>';
+    }
+
+    function editMarker(marker){
+        const newRadius = parseFloat(prompt('Enter new radius for this marker (' + marker.radiusUnit + '):', marker.radiusValue));
+        if (!isNaN(newRadius) && newRadius > 0){
+            marker.radiusValue = newRadius;
+            const meters = convertRadius(newRadius, marker.radiusUnit);
+            marker.circle.setRadius(meters);
+            marker.setPopupContent(getPopupContent(marker));
+        }
+    }
+
+    function removeMarker(marker){
+        markers.removeLayer(marker);
+        markers.removeLayer(marker.circle);
+        delete allMarkers[marker._leaflet_id];
+        refreshMarkerList();
+    }
+
+    window.editMarkerById = function(id){
+        const marker = allMarkers[id];
+        if(marker){
+            editMarker(marker);
+        }
+    };
+
+    window.removeMarkerById = function(id){
+        const marker = allMarkers[id];
+        if(marker){
+            removeMarker(marker);
+        }
+    };
+
+    map.on('click', function(e){
+        const {lat, lng} = e.latlng;
+        addMarker(lat, lng);
+    });
+
+    locateBtn.addEventListener('click', function(){
+        if (!navigator.geolocation){
+            alert('Geolocation not supported by your browser');
+            return;
+        }
+        locateBtn.disabled = true; locateBtn.textContent = 'Locating...';
+        navigator.geolocation.getCurrentPosition(function(pos){
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            addMarker(lat, lng);
+            map.setView([lat,lng], 14);
+            locateBtn.disabled = false; locateBtn.textContent = 'Locate me (Geolocation)';
+        }, function(err){
+            alert('Geolocation error: ' + err.message);
+            locateBtn.disabled = false; locateBtn.textContent = 'Locate me (Geolocation)';
+        }, {enableHighAccuracy: true, timeout: 10000});
+    });
+
+    clearBtn.addEventListener('click', function(){
+        markers.clearLayers();
+        Object.keys(allMarkers).forEach(k=> delete allMarkers[k]);
+        refreshMarkerList();
+        clearCoordsUI();
+    });
+
+    copyBtn.addEventListener('click', async function(){
+        const latText = latEl.textContent.replace('Lat: ','').trim();
+        const lngText = lngEl.textContent.replace('Lng: ','').trim();
+        if (latText === '—' || lngText === '—'){
+            alert('No coordinates to copy — click the map or locate yourself first');
+            return;
+        }
+        const payload = latText + ',' + lngText;
+        try{
+            await navigator.clipboard.writeText(payload);
+            copyBtn.textContent = 'Copied!';
+            setTimeout(()=> copyBtn.textContent = 'Copy lat,lng', 1200);
+        }catch(e){
+            prompt('Copy these coordinates', payload);
+        }
+    });
+
+    const initial = L.circleMarker(DEFAULT_CENTER, {radius:6}).addTo(markers);
+    initial.bindPopup('Default center — Switzerland');
+
+    window.addEventListener('keydown', function(e){ if (e.key === 'c') markers.clearLayers(); });
+    if (window.innerWidth < 600) map.setZoom(7);
+</script>
+</body>
+</html>
