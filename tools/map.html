@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>OpenStreetMap — Static Leaflet Page</title>
+    <link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .burger {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1100;
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .side-menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 280px;
+            max-width: 85vw;
+            box-sizing: border-box;
+            background: #fff;
+            box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+            z-index: 1050;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .side-menu.open {
+            transform: translateX(0);
+        }
+
+        .menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .menu-close {
+            background: none;
+            border: none;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+
+        .menu-section { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
+        .menu-section:last-child { border-bottom: none; }
+        .menu-section h4 {
+            margin: 16px 0 6px;
+            font-size: 13px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .menu-section button, .menu-section select, .menu-section input {
+            box-sizing: border-box;
+            margin-top: 6px;
+            width: 100%;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background: #f7f7f7;
+            cursor: pointer;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            font-size: 16px;
+            font-weight: 600;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+        }
+        .chevron { transition: transform 0.2s ease; }
+        .section-header[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+        .section-content.collapsed { display: none; }
+
+        .utility-row { margin-top: 10px; }
+        .utility-row label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 400;
+            cursor: pointer;
+        }
+        .utility-row input[type="checkbox"] {
+            width: auto;
+            margin-top: 0;
+            padding: 0;
+            border: none;
+            background: none;
+        }
+        .utility-status {
+            display: block;
+            margin-left: 26px;
+            color: #888;
+            font-size: 11px;
+        }
+
+        .coords {
+            font-family: monospace;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .coords small { color: #444; }
+
+        .marker-item { padding: 6px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .marker-item:hover { background: #f3f3f3; }
+    </style>
+</head>
+<body>
+<button aria-label="Toggle menu" class="burger" id="menuToggle">&#9776;</button>
+<div class="side-menu" id="sideMenu">
+    <div class="menu-header">
+        <strong>Map Tools</strong>
+        <button aria-label="Close menu" class="menu-close" id="menuClose">&times;</button>
+    </div>
+    <div class="menu-section">
+        <button aria-expanded="true" class="section-header" data-target="radiusContent">
+            <span>Radius</span>
+            <span class="chevron">&#9662;</span>
+        </button>
+        <div class="section-content" id="radiusContent">
+            <div style="margin-top:6px">Click on the map to place a marker with a radius overlay. Right-click a marker for options.</div>
+            <div class="coords" id="coords">
+                <small id="lat">Lat: —</small>
+                <small id="lng">Lng: —</small>
+            </div>
+            <label for="radiusInput">Radius</label>
+            <input id="radiusInput" min="0.1" step="0.1" type="number" value="1" />
+            <select id="unitSelect">
+                <option selected value="km">Kilometers</option>
+                <option value="mi">Miles</option>
+            </select>
+            <label for="labelInput">Label</label>
+            <input id="labelInput" placeholder="Optional marker label" type="text" />
+            <button id="locateBtn">Locate me (Geolocation)</button>
+            <button id="clearBtn">Clear markers</button>
+            <button id="copyBtn">Copy lat,lng</button>
+
+            <h4>Markers</h4>
+            <div id="markerList">No markers yet</div>
+        </div>
+    </div>
+
+    <div class="menu-section">
+        <button aria-expanded="true" class="section-header" data-target="utilitiesContent">
+            <span>Utilities</span>
+            <span class="chevron">&#9662;</span>
+        </button>
+        <div class="section-content" id="utilitiesContent">
+            <div class="utility-row">
+                <label><input id="toiletsCheckbox" type="checkbox" /> WC / Toilets</label>
+                <small class="utility-status" id="toiletsStatus"></small>
+            </div>
+            <div class="utility-row">
+                <label><input id="waterCheckbox" type="checkbox" /> Drinking water</label>
+                <small class="utility-status" id="waterStatus"></small>
+            </div>
+            <div class="utility-row">
+                <label><input id="fuelCheckbox" type="checkbox" /> Gas stations</label>
+                <small class="utility-status" id="fuelStatus"></small>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="map"></div>
+
+<script crossorigin="" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const DEFAULT_CENTER = [46.8182, 8.2275];
+    const DEFAULT_ZOOM = 8;
+
+    const map = L.map('map', {
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        zoomControl: false
+    });
+
+    L.control.zoom({position: 'bottomright'}).addTo(map);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    L.control.scale({imperial: false}).addTo(map);
+
+    const markers = L.layerGroup().addTo(map);
+
+    const latEl = document.getElementById('lat');
+    const lngEl = document.getElementById('lng');
+    const locateBtn = document.getElementById('locateBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const radiusInput = document.getElementById('radiusInput');
+    const unitSelect = document.getElementById('unitSelect');
+    const labelInput = document.getElementById('labelInput');
+    const markerList = document.getElementById('markerList');
+    const menuToggle = document.getElementById('menuToggle');
+    const sideMenu = document.getElementById('sideMenu');
+    const menuClose = document.getElementById('menuClose');
+
+    menuToggle.addEventListener('click', () => sideMenu.classList.toggle('open'));
+    menuClose.addEventListener('click', () => sideMenu.classList.remove('open'));
+
+    document.querySelectorAll('.section-header').forEach(header => {
+        const content = document.getElementById(header.dataset.target);
+        header.addEventListener('click', () => {
+            const expanded = header.getAttribute('aria-expanded') === 'true';
+            header.setAttribute('aria-expanded', String(!expanded));
+            content.classList.toggle('collapsed', expanded);
+        });
+    });
+
+    const allMarkers = {};
+
+    function setCoordsUI(lat, lng){
+        latEl.textContent = 'Lat: ' + lat.toFixed(6);
+        lngEl.textContent = 'Lng: ' + lng.toFixed(6);
+    }
+
+    function clearCoordsUI(){
+        latEl.textContent = 'Lat: —';
+        lngEl.textContent = 'Lng: —';
+    }
+
+    function convertRadius(value, unit){
+        if(unit === 'km') return value * 1000;
+        if(unit === 'mi') return value * 1609.34;
+        return value;
+    }
+
+    function refreshMarkerList(){
+        markerList.innerHTML = '';
+        const ids = Object.keys(allMarkers);
+        if(ids.length === 0){
+            markerList.textContent = 'No markers yet';
+            return;
+        }
+        ids.forEach(id => {
+            const marker = allMarkers[id];
+            const item = document.createElement('div');
+            item.className = 'marker-item';
+            item.textContent = marker.label || `Marker ${id}`;
+            item.onclick = () => {
+                map.setView(marker.getLatLng(), 13);
+                marker.openPopup();
+            };
+            markerList.appendChild(item);
+        });
+    }
+
+    function addMarker(lat, lng){
+        const m = L.marker([lat, lng]).addTo(markers);
+        const radiusMeters = convertRadius(parseFloat(radiusInput.value), unitSelect.value);
+        const circle = L.circle([lat, lng], {
+            radius: radiusMeters,
+            color: '#333',
+            weight: 2,
+            fillColor: '#3388ff',
+            fillOpacity: 0.2
+        }).addTo(markers);
+
+        m.circle = circle;
+        m.radiusValue = parseFloat(radiusInput.value);
+        m.radiusUnit = unitSelect.value;
+        m.label = labelInput.value.trim();
+
+        m.bindPopup(getPopupContent(m), {closeButton: false});
+
+        m.on('contextmenu', (e) => {
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent(`<button onclick="editMarkerById(${m._leaflet_id})">Edit radius</button><br><button onclick="removeMarkerById(${m._leaflet_id})">Remove marker</button>`)
+                .openOn(map);
+        });
+
+        allMarkers[m._leaflet_id] = m;
+        refreshMarkerList();
+
+        setCoordsUI(lat, lng);
+    }
+
+    function escapeHtml(str){
+        return String(str).replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    function getPopupContent(marker){
+        return '<strong>' + escapeHtml(marker.label || 'Marker') + '</strong><br>Lat: ' + marker.getLatLng().lat.toFixed(6) + '<br>Lng: ' + marker.getLatLng().lng.toFixed(6) +
+            '<br>Radius: ' + marker.radiusValue + ' ' + marker.radiusUnit +
+            '<br><button onclick="editMarkerById(' + marker._leaflet_id + ')">Edit radius</button>' +
+            '<br><button onclick="removeMarkerById(' + marker._leaflet_id + ')">Remove marker</button>';
+    }
+
+    function editMarker(marker){
+        const newRadius = parseFloat(prompt('Enter new radius for this marker (' + marker.radiusUnit + '):', marker.radiusValue));
+        if (!isNaN(newRadius) && newRadius > 0){
+            marker.radiusValue = newRadius;
+            const meters = convertRadius(newRadius, marker.radiusUnit);
+            marker.circle.setRadius(meters);
+            marker.setPopupContent(getPopupContent(marker));
+        }
+    }
+
+    function removeMarker(marker){
+        markers.removeLayer(marker);
+        markers.removeLayer(marker.circle);
+        delete allMarkers[marker._leaflet_id];
+        refreshMarkerList();
+    }
+
+    window.editMarkerById = function(id){
+        const marker = allMarkers[id];
+        if(marker){
+            editMarker(marker);
+        }
+    };
+
+    window.removeMarkerById = function(id){
+        const marker = allMarkers[id];
+        if(marker){
+            removeMarker(marker);
+        }
+    };
+
+    map.on('click', function(e){
+        const {lat, lng} = e.latlng;
+        addMarker(lat, lng);
+    });
+
+    locateBtn.addEventListener('click', function(){
+        if (!navigator.geolocation){
+            alert('Geolocation not supported by your browser');
+            return;
+        }
+        locateBtn.disabled = true; locateBtn.textContent = 'Locating...';
+        navigator.geolocation.getCurrentPosition(function(pos){
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            addMarker(lat, lng);
+            map.setView([lat,lng], 14);
+            locateBtn.disabled = false; locateBtn.textContent = 'Locate me (Geolocation)';
+        }, function(err){
+            alert('Geolocation error: ' + err.message);
+            locateBtn.disabled = false; locateBtn.textContent = 'Locate me (Geolocation)';
+        }, {enableHighAccuracy: true, timeout: 10000});
+    });
+
+    clearBtn.addEventListener('click', function(){
+        markers.clearLayers();
+        Object.keys(allMarkers).forEach(k=> delete allMarkers[k]);
+        refreshMarkerList();
+        clearCoordsUI();
+    });
+
+    copyBtn.addEventListener('click', async function(){
+        const latText = latEl.textContent.replace('Lat: ','').trim();
+        const lngText = lngEl.textContent.replace('Lng: ','').trim();
+        if (latText === '—' || lngText === '—'){
+            alert('No coordinates to copy — click the map or locate yourself first');
+            return;
+        }
+        const payload = latText + ',' + lngText;
+        try{
+            await navigator.clipboard.writeText(payload);
+            copyBtn.textContent = 'Copied!';
+            setTimeout(()=> copyBtn.textContent = 'Copy lat,lng', 1200);
+        }catch(e){
+            prompt('Copy these coordinates', payload);
+        }
+    });
+
+    const initial = L.circleMarker(DEFAULT_CENTER, {radius:6}).addTo(markers);
+    initial.bindPopup('Default center — Switzerland');
+
+    window.addEventListener('keydown', function(e){ if (e.key === 'c') markers.clearLayers(); });
+    if (window.innerWidth < 600) map.setZoom(7);
+
+    const MIN_UTILITY_ZOOM = 13;
+    const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+
+    const UTILITY_CONFIG = {
+        toilets: { amenity: 'toilets', label: 'Toilet', color: '#8e44ad', checkbox: 'toiletsCheckbox', status: 'toiletsStatus' },
+        water: { amenity: 'drinking_water', label: 'Drinking water', color: '#2980b9', checkbox: 'waterCheckbox', status: 'waterStatus' },
+        fuel: { amenity: 'fuel', label: 'Gas station', color: '#e67e22', checkbox: 'fuelCheckbox', status: 'fuelStatus' }
+    };
+
+    const utilityLayers = {};
+    const utilityRequestSeq = {};
+    Object.keys(UTILITY_CONFIG).forEach(key => {
+        utilityLayers[key] = L.layerGroup();
+        utilityRequestSeq[key] = 0;
+    });
+
+    function setUtilityStatus(key, text){
+        document.getElementById(UTILITY_CONFIG[key].status).textContent = text;
+    }
+
+    async function fetchUtilityData(key){
+        const cfg = UTILITY_CONFIG[key];
+        const bounds = map.getBounds();
+        const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(',');
+        const query = '[out:json][timeout:25];node["amenity"="' + cfg.amenity + '"](' + bbox + ');out body;';
+        const res = await fetch(OVERPASS_URL + '?data=' + encodeURIComponent(query));
+        if (!res.ok) throw new Error('Overpass request failed: ' + res.status);
+        return res.json();
+    }
+
+    function renderUtilityLayer(key, data){
+        const cfg = UTILITY_CONFIG[key];
+        const layer = utilityLayers[key];
+        layer.clearLayers();
+        (data.elements || []).forEach(el => {
+            if (el.lat == null || el.lon == null) return;
+            const marker = L.circleMarker([el.lat, el.lon], {
+                radius: 6,
+                color: cfg.color,
+                weight: 2,
+                fillColor: cfg.color,
+                fillOpacity: 0.85
+            });
+            const name = escapeHtml((el.tags && el.tags.name) || cfg.label);
+            marker.bindPopup('<strong>' + name + '</strong><br>' + escapeHtml(cfg.label));
+            layer.addLayer(marker);
+        });
+        return (data.elements || []).length;
+    }
+
+    async function refreshUtilityLayer(key){
+        if (map.getZoom() < MIN_UTILITY_ZOOM){
+            setUtilityStatus(key, 'Zoom in further to load this layer');
+            return;
+        }
+        const seq = ++utilityRequestSeq[key];
+        setUtilityStatus(key, 'Loading…');
+        try{
+            const data = await fetchUtilityData(key);
+            if (seq !== utilityRequestSeq[key] || !utilityCheckboxes[key].checked) return;
+            const count = renderUtilityLayer(key, data);
+            setUtilityStatus(key, count + ' found in view');
+        }catch(e){
+            if (seq !== utilityRequestSeq[key] || !utilityCheckboxes[key].checked) return;
+            setUtilityStatus(key, 'Failed to load');
+        }
+    }
+
+    const utilityCheckboxes = {};
+    Object.keys(UTILITY_CONFIG).forEach(key => {
+        const checkbox = document.getElementById(UTILITY_CONFIG[key].checkbox);
+        utilityCheckboxes[key] = checkbox;
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked){
+                map.addLayer(utilityLayers[key]);
+                refreshUtilityLayer(key);
+            } else {
+                map.removeLayer(utilityLayers[key]);
+                setUtilityStatus(key, '');
+            }
+        });
+    });
+
+    let utilityMoveTimer = null;
+    map.on('moveend', function(){
+        clearTimeout(utilityMoveTimer);
+        utilityMoveTimer = setTimeout(() => {
+            Object.keys(utilityCheckboxes).forEach(key => {
+                if (utilityCheckboxes[key].checked) refreshUtilityLayer(key);
+            });
+        }, 600);
+    });
+</script>
+</body>
+</html>
