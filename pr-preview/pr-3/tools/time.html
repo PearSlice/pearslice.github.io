@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unix Time → Local Time Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+            max-width: 500px;
+            margin: auto;
+        }
+        input {
+            padding: 0.5rem;
+            font-size: 1rem;
+            margin: 0.5rem 0;
+            width: 100%;
+        }
+        .result, .current-time {
+            margin-top: 1rem;
+            font-weight: bold;
+            white-space: pre-line;
+            cursor: pointer;
+        }
+        .current-time {
+            color: blue;
+        }
+        .tooltip {
+            font-weight: normal;
+            font-size: 0.9rem;
+            color: green;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+<h1>Unix Time → Local Time</h1>
+<p>Paste a Unix timestamp (seconds or milliseconds):</p>
+<input type="number" id="unixInput" placeholder="e.g., 1695379200 or 1695379200000">
+<div class="result" id="result" title="Click to copy"></div>
+
+<h2>Current Unix Time</h2>
+<div class="current-time" id="currentUnix" title="Click to copy"></div>
+
+<script>
+    const input = document.getElementById('unixInput');
+    const result = document.getElementById('result');
+    const currentUnix = document.getElementById('currentUnix');
+
+    input.addEventListener('input', convertTime);
+
+    function convertTime() {
+        const value = input.value.trim();
+        if (!value) {
+            result.innerText = '';
+            return;
+        }
+
+        const timestamp = Number(value);
+        if (isNaN(timestamp)) {
+            result.innerText = 'Invalid number.';
+            return;
+        }
+
+        let unit = '';
+        let date;
+
+        // Heuristic: if timestamp is longer than 10 digits, assume milliseconds
+        if (timestamp > 1e12) {
+            unit = 'milliseconds';
+            date = new Date(timestamp);
+        } else {
+            unit = 'seconds';
+            date = new Date(timestamp * 1000);
+        }
+
+        if (isNaN(date.getTime())) {
+            result.innerText = 'Invalid Unix timestamp.';
+            return;
+        }
+
+        // Compare with current time
+        const now = new Date();
+        let diffMs = date - now; // positive if future
+        const isFuture = diffMs > 0;
+        diffMs = Math.abs(diffMs);
+
+        // Convert difference to human-readable
+        const seconds = Math.floor(diffMs / 1000) % 60;
+        const minutes = Math.floor(diffMs / (1000 * 60)) % 60;
+        const hours = Math.floor(diffMs / (1000 * 60 * 60)) % 24;
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        let diffString = '';
+        if (days > 0) diffString += `${days}d `;
+        if (hours > 0) diffString += `${hours}h `;
+        if (minutes > 0) diffString += `${minutes}m `;
+        diffString += `${seconds}s`;
+
+        // Display both Unix timestamp and formatted date
+        const unixDisplay = unit === 'milliseconds' ? Math.floor(timestamp / 1000) : timestamp;
+        const displayText =
+            `Detected unit: ${unit}\n` +
+            `Local Time: ${date.toLocaleString()}\n` +
+            `Compared to now: ${isFuture ? 'In the future' : 'In the past'} (${diffString})\n` +
+            `Unix Time (s): ${unixDisplay}\nClick to copy`;
+
+        result.innerText = displayText;
+    }
+
+    // Copy to clipboard helper
+    function copyToClipboard(text, element) {
+        navigator.clipboard.writeText(text).then(() => {
+            const original = element.innerText;
+            element.innerText = 'Copied!';
+            setTimeout(() => element.innerText = original, 1000);
+        });
+    }
+
+    // Live current Unix time in seconds
+    function updateCurrentUnix() {
+        const nowSec = Math.floor(Date.now() / 1000);
+        currentUnix.innerText = nowSec + ' s';
+    }
+
+    setInterval(updateCurrentUnix, 1000);
+    updateCurrentUnix(); // initial call
+
+    // Click to copy
+    currentUnix.addEventListener('click', () => {
+        copyToClipboard(currentUnix.innerText.replace(' s',''), currentUnix);
+    });
+
+    result.addEventListener('click', () => {
+        const lines = result.innerText.split('\n');
+        const unixLine = lines.find(line => line.startsWith('Unix Time (s):'));
+        if (unixLine) {
+            const unixTime = unixLine.split(':')[1].trim();
+            copyToClipboard(unixTime, result);
+        }
+    });
+</script>
+</body>
+</html>
