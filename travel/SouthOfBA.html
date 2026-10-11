@@ -14,17 +14,17 @@
 :root{
   --bg:#eef1ee; --panel:#f8faf8; --fg:#1d2522; --muted:#5b6762; --line:#d3dad6;
   --sea:#dfe9ee; --land:#f4f2e9; --land-line:#c7c2ad; --nb:#e8e8e2;
-  --p10:#0f7c8c; --cdp:#c27a12; --bb:#8a3f8f; --bp:#c0392f; --lat:#b0443a;
+  --p10:#0f7c8c; --cdp:#c27a12; --bb:#8a3f8f; --bp:#c0392f; --route:#d81b78; --route-edge:#3a0a22; --lat:#b0443a;
   --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#131a18; --panel:#19221f; --fg:#e4ebe7; --muted:#97a59f; --line:#2c3833;
   --sea:#0f1a20; --land:#232b27; --land-line:#45514a; --nb:#1c2320;
-  --p10:#3cb8c8; --cdp:#e5a33c; --bb:#c27ac7; --bp:#ee7468; --lat:#e0766b; color-scheme:dark}}
+  --p10:#3cb8c8; --cdp:#e5a33c; --bb:#c27ac7; --bp:#ee7468; --route:#ff4fa8; --route-edge:#1a0410; --lat:#e0766b; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#131a18; --panel:#19221f; --fg:#e4ebe7; --muted:#97a59f; --line:#2c3833;
   --sea:#0f1a20; --land:#232b27; --land-line:#45514a; --nb:#1c2320;
-  --p10:#3cb8c8; --cdp:#e5a33c; --bb:#c27ac7; --bp:#ee7468; --lat:#e0766b; color-scheme:dark}
+  --p10:#3cb8c8; --cdp:#e5a33c; --bb:#c27ac7; --bp:#ee7468; --route:#ff4fa8; --route-edge:#1a0410; --lat:#e0766b; color-scheme:dark}
 html,body{height:100%}
 body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--body);display:flex;flex-direction:column}
 header{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -68,7 +68,35 @@ aside{display:flex;flex-direction:column;border-left:1px solid var(--line);backg
 .leaflet-control-zoom a{background:var(--panel)!important;color:var(--fg)!important;border-color:var(--line)!important}
 .latlabel{font:500 .7rem var(--mono);color:var(--lat);white-space:nowrap;background:none;border:none}
 .marker{border-radius:50%;box-shadow:0 0 0 1.5px var(--panel),0 1px 3px rgba(0,0,0,.35)}
-@media (max-width:760px){main{grid-template-columns:1fr;grid-template-rows:60vh 1fr}aside{border-left:0;border-top:1px solid var(--line)}.sep{display:none}}
+#towns{display:flex;flex-direction:column;flex:1;min-height:0}
+.sheetbar{display:none}
+@media (max-width:760px){
+  header{padding:8px 12px;gap:6px}
+  h1{font-size:1.25rem} h1 small{font-size:.72rem}
+  .filters{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;scrollbar-width:none}
+  .filters::-webkit-scrollbar{display:none}
+  .chip{white-space:nowrap;flex:none;padding:4px 10px}
+  .sep{display:none}
+  main{display:block;position:relative;flex:1;min-height:0}
+  #map{position:absolute;inset:0}
+  .leaflet-bottom{bottom:64px}
+  #sheet{position:absolute;left:0;right:0;bottom:0;z-index:1000;height:64px;border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -6px 20px rgba(0,0,0,.22);transition:height .2s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  #sheet.open{height:min(70%,560px)}
+  .sheetbar{display:flex;flex-direction:column;align-items:stretch;flex:none}
+  #sheettoggle{border:0;background:none;padding:6px 0 2px;cursor:pointer;display:grid;place-items:center}
+  .grip{width:40px;height:4px;border-radius:2px;background:var(--line)}
+  .tabs{display:flex;gap:6px;padding:2px 12px 8px}
+  .tabs button{flex:1;font:600 .9rem var(--body);padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+  .tabs .cnt{font:500 .75rem var(--mono);opacity:.75;margin-left:4px}
+  #sheet .pane{display:none}
+  #sheet.open .pane.active{display:flex;flex-direction:column;flex:1;min-height:0}
+  #trip{max-height:none;border-bottom:0}
+  #stops{flex:1}
+  #stops li{padding:8px 12px}
+  #stops li .h{font-size:1.3rem;padding:4px 0}
+}
+@media (prefers-reduced-motion:reduce){#sheet{transition:none}}
 @media (prefers-reduced-motion:reduce){.leaflet-fade-anim .leaflet-popup,.leaflet-zoom-anim .leaflet-zoom-animated{transition:none!important}}
 
 #trip{border-bottom:2px solid var(--line);display:flex;flex-direction:column;max-height:45%;min-height:0}
@@ -83,7 +111,7 @@ aside{display:flex;flex-direction:column;border-left:1px solid var(--line);backg
 #stops{list-style:none;margin:0;padding:0 0 6px;overflow:auto;min-height:0}
 #stops li{display:grid;grid-template-columns:18px 22px 1fr auto 26px;gap:8px;align-items:center;padding:5px 12px;background:var(--panel)}
 #stops li .h{cursor:grab;color:var(--muted);font-size:1rem;line-height:1;user-select:none;touch-action:none}
-#stops li .num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--fg);color:var(--panel);font:600 .72rem var(--mono)}
+#stops li .num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--route);color:#fff;font:600 .72rem var(--mono)}
 #stops li .nm{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #stops li .leg{font:400 .7rem/1.25 var(--mono);color:var(--muted);white-space:nowrap;text-align:right}
 #tripsum .kind{font:400 .68rem var(--body);color:var(--muted)}
@@ -98,7 +126,7 @@ aside{display:flex;flex-direction:column;border-left:1px solid var(--line);backg
 #list li{grid-template-columns:16px 1fr auto 24px}
 .pop .addbtn{margin-top:10px;width:100%;font:600 .85rem var(--body);padding:6px;border-radius:6px;border:1px solid var(--fg);background:var(--fg);color:var(--panel);cursor:pointer}
 .pop .addbtn.on{background:transparent;color:var(--fg)}
-.stopicon div{width:22px;height:22px;border-radius:50%;background:var(--fg);color:var(--panel);display:grid;place-items:center;font:600 .72rem/1 var(--mono);box-shadow:0 0 0 2px var(--panel),0 1px 4px rgba(0,0,0,.4)}
+.stopicon div{width:22px;height:22px;border-radius:50%;background:var(--route);color:#fff;display:grid;place-items:center;font:600 .72rem/1 var(--mono);box-shadow:0 0 0 2px var(--panel),0 1px 4px rgba(0,0,0,.4)}
 </style>
 <style>body{margin:0}*,*::before,*::after{box-sizing:border-box}</style>
 </head>
@@ -117,8 +145,15 @@ aside{display:flex;flex-direction:column;border-left:1px solid var(--line);backg
 </header>
 <main>
   <div id="map" aria-label="Map of terminals"></div>
-  <aside>
-    <section id="trip" aria-label="My trip">
+  <aside id="sheet">
+    <div class="sheetbar">
+      <button type="button" id="sheettoggle" aria-expanded="false" aria-label="Show or hide the panel"><span class="grip"></span></button>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-trip" data-pane="trip">My trip <span id="tripcount" class="cnt">0</span></button>
+        <button type="button" role="tab" id="tab-towns" data-pane="towns">Towns <span id="towncount" class="cnt"></span></button>
+      </div>
+    </div>
+    <section id="trip" class="pane" aria-label="My trip">
       <div class="triphead"><h2>My trip</h2><span id="tripsum"></span>
         <label class="roadtoggle"><input type="checkbox" id="roads" checked>Follow roads</label>
         <button class="tbtn" id="share" type="button">Share</button><button class="tbtn" id="clear" type="button">Clear</button><span id="clearask" hidden>Clear all stops? <button class="tbtn" id="clearyes" type="button">Yes, clear</button> <button class="tbtn" id="clearno" type="button">Keep</button></span></div>
@@ -126,9 +161,11 @@ aside{display:flex;flex-direction:column;border-left:1px solid var(--line);backg
       <div id="incoming" hidden><span id="incomingmsg"></span> <button class="tbtn" id="inyes" type="button">Load shared trip</button> <button class="tbtn" id="inno" type="button">Keep mine</button></div>
       <ol id="stops"></ol>
     </section>
+    <div id="towns" class="pane">
     <div class="searchrow"><input id="q" type="search" placeholder="Find a town or province" aria-label="Search terminals"><span id="count"></span></div>
     <ul id="list"></ul>
     <div class="note">Marker colours show which sites sell the terminal; a split dot is sold on several.<br><strong>Disclaimer:</strong> This map was AI-generated on 11 October 2026 by scraping Plataforma10, Central de Pasajes, Busbud and Busplus. Busbud coverage is incomplete, so a missing Busbud colour means "not seen", not "not sold". Travel distances and times are estimates; check schedules with the bus company before you travel.</div>
+    </div>
   </aside>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -170,14 +207,14 @@ function render(listOnly){
   if(!listOnly)layer.clearLayers();
   const vis=T.filter(t=>cc[t.country]&&on.some(k=>t[k])&&(!q||(t.city+" "+t.province_or_region).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").includes(q)));
   if(!listOnly)vis.forEach(t=>layer.addLayer(t.m));
-  $("count").textContent=vis.length+" of "+T.length;
+  $("count").textContent=vis.length+" of "+T.length;if(window.counts)counts();
   const ul=$("list");ul.innerHTML="";let g="";
   vis.forEach(t=>{
     const key=t.country+" · "+t.province_or_region;
     if(key!=g){g=key;const h=document.createElement("li");h.className="grp";h.textContent=key;ul.appendChild(h)}
     const li=document.createElement("li");li.tabIndex=0;
     li.innerHTML=`<span class="dot" style="background:${fill(t)}"></span><span><span class="c">${t.city}</span></span><span class="lat">${(-t.lat).toFixed(1)}°S</span><button type="button" class="add${inTrip(t)?" on":""}" data-id="${t.id}" aria-label="${inTrip(t)?"Remove "+t.city+" from":"Add "+t.city+" to"} trip">${inTrip(t)?"✓":"+"}</button>`;
-    const go=()=>{map.flyTo([t.lat,t.lon],Math.max(map.getZoom(),8),{duration:.6});t.m.openPopup()};
+    const go=()=>{if(window.collapseOnMobile)collapseOnMobile();map.flyTo([t.lat,t.lon],Math.max(map.getZoom(),8),{duration:.6});t.m.openPopup()};
     li.onclick=e=>{if(!e.target.closest(".add"))go()};li.onkeydown=e=>{if(e.key=="Enter")go()};
     ul.appendChild(li);
   });
@@ -214,19 +251,20 @@ function renderTrip(){
     const leg=i&&legs[i-1]!=null?fmt(legs[i-1])+"<br>~"+fh(hrs[i-1]):"";
     li.innerHTML=`<span class="h" aria-hidden="true">⠿</span><span class="num">${i+1}</span><span class="nm" title="${t.city}, ${t.province_or_region}">${t.city}</span><span class="leg">${leg}</span><button type="button" class="rm" aria-label="Remove ${t.city}">×</button>`;
     li.querySelector(".rm").onclick=()=>toggle(id);
-    li.querySelector(".nm").onclick=()=>{map.flyTo([t.lat,t.lon],Math.max(map.getZoom(),8),{duration:.6});t.m.openPopup()};
+    li.querySelector(".nm").onclick=()=>{if(window.collapseOnMobile)collapseOnMobile();map.flyTo([t.lat,t.lon],Math.max(map.getZoom(),8),{duration:.6});t.m.openPopup()};
     ol.appendChild(li)});
   tripLayer.clearLayers();
   trip.forEach((id,i)=>{const t=BYID[id];L.marker([t.lat,t.lon],{zIndexOffset:1000,icon:L.divIcon({className:"stopicon",html:`<div>${i+1}</div>`,iconSize:[22,22],iconAnchor:[11,11]})}).on("click",()=>t.m.openPopup()).bindTooltip(t.city).addTo(tripLayer)});
   summary();
   drawRoute();
+  if(window.counts)counts();
 }
 function summary(){
   const tot=legs.reduce((a,b)=>a+(b||0),0),th=hrs.reduce((a,b)=>a+(b||0),0);
   $("tripsum").innerHTML=trip.length?`${trip.length} stop${trip.length>1?"s":""}`+(trip.length>1&&legs.length?` · ${fmt(tot)} · ~${fh(th)} by bus<br><span class="kind">${legKind}</span>`:""):"No stops yet";
 }
 function straight(){legs=trip.slice(1).map((id,i)=>km([BYID[trip[i]].lat,BYID[trip[i]].lon],[BYID[id].lat,BYID[id].lon]));hrs=legs.map(k=>k*FALLBACK_ROAD/FALLBACK_KMH);legKind="straight-line distance; time assumes roads 25% longer at 60 km/h";return trip.map(id=>[BYID[id].lat,BYID[id].lon])}
-function setLine(pts,dashed){if(routeLine)map.removeLayer(routeLine);routeLine=pts.length>1?L.polyline(pts,{color:css("--fg"),weight:dashed?2.5:4,opacity:.8,dashArray:dashed?"6 6":null,interactive:false}).addTo(map):null}
+function setLine(pts,dashed){if(routeLine)map.removeLayer(routeLine);routeLine=pts.length>1?L.layerGroup([L.polyline(pts,{color:css("--route-edge"),weight:dashed?6:8,opacity:.55,interactive:false}),L.polyline(pts,{color:css("--route"),weight:dashed?3.5:5,opacity:1,dashArray:dashed?"8 7":null,lineCap:dashed?"butt":"round",interactive:false})]).addTo(map):null}
 function updLegs(){const lis=[...$("stops").querySelectorAll("li[data-id]")];lis.forEach((li,i)=>{li.querySelector(".leg").innerHTML=i&&legs[i-1]!=null?fmt(legs[i-1])+"<br>~"+fh(hrs[i-1]):""});summary()}
 async function drawRoute(){
   const seq=++routeSeq;
@@ -253,6 +291,16 @@ async function drawRoute(){
 }
 if(window.Sortable)Sortable.create($("stops"),{handle:".h",animation:150,ghostClass:"ghost",chosenClass:"chosen",filter:".empty",onEnd:()=>{trip=[...$("stops").querySelectorAll("li[data-id]")].map(li=>li.dataset.id);tripChanged()}});
 renderTrip();
+
+const sheet=$("sheet"),mq=matchMedia("(max-width:760px)");
+let pane=trip.length?"trip":"towns";
+function setPane(p){pane=p;["trip","towns"].forEach(x=>{$(x).classList.toggle("active",x===p);$("tab-"+x).setAttribute("aria-selected",x===p)})}
+function setOpen(o){sheet.classList.toggle("open",o);$("sheettoggle").setAttribute("aria-expanded",o);setTimeout(()=>map.invalidateSize(),250)}
+$("sheettoggle").onclick=()=>setOpen(!sheet.classList.contains("open"));
+["trip","towns"].forEach(x=>$("tab-"+x).onclick=()=>{if(pane===x&&sheet.classList.contains("open"))setOpen(false);else{setPane(x);setOpen(true)}});
+setPane(pane);
+function counts(){$("tripcount").textContent=trip.length;$("towncount").textContent=$("count").textContent.split(" ")[0]}
+function collapseOnMobile(){if(mq.matches)setOpen(false)}
 
 const SHARE_BASE=location.hostname==="pearslice.github.io"?location.origin+location.pathname:"https://pearslice.github.io/travel/SouthOfBA.html";
 function encTrip(){return "t="+trip.map(id=>{const t=BYID[id];return encodeURIComponent(t.city).replace(/[~.]/g,c=>c=="~"?"%7E":"%2E")+"."+(t.country=="Chile"?"C":"A")}).join("~")+($("roads").checked?"":"&r=0")}
