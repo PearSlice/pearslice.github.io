@@ -74,7 +74,8 @@ aside{display:flex;flex-direction:column;border-left:1px solid var(--line);backg
 #trip{border-bottom:2px solid var(--line);display:flex;flex-direction:column;max-height:45%;min-height:0}
 .triphead{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:10px 12px 8px}
 .triphead h2{margin:0;font:700 1.15rem/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
-#tripsum{font:500 .78rem var(--mono);color:var(--muted);flex:1;min-width:0}
+#tripsum{font:500 .78rem/1.35 var(--mono);color:var(--muted);flex-basis:100%;order:5;min-width:0}
+.triphead .roadtoggle{margin-left:auto}
 .tbtn{font:600 .78rem var(--body);border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 9px;cursor:pointer}
 .tbtn:hover{border-color:var(--fg)}
 .tbtn:focus-visible,.add:focus-visible,.rm:focus-visible{outline:2px solid var(--fg);outline-offset:1px}
